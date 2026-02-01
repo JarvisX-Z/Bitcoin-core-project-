@@ -1,94 +1,110 @@
 #include <iostream>
-#include <stdexcept>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
 
-// Template-based Stack implementation
-template <typename T> class Stack {
-private:
-  std::vector<T> elements;
+// A simple implementation of a "Block" in a Blockchain (Bitcoin's core concept)
+// This uses a Linked List structure where each block points to the previous block's hash.
 
+class Block {
 public:
-  void push(T const &elem) { elements.push_back(elem); }
-  void pop() {
-    if (elements.empty()) {
-      throw std::out_of_range("Stack<>::pop(): empty stack");
+    int index;
+    long long timestamp;
+    std::string data;
+    std::string previousHash;
+    std::string hash;
+    int nonce;
+
+    Block(int idx, const std::string& d, const std::string& prevHash) 
+        : index(idx), data(d), previousHash(prevHash), nonce(0) {
+        timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        hash = calculateHash();
     }
-    elements.pop_back();
-  }
-  T top() const {
-    if (elements.empty()) {
-      throw std::out_of_range("Stack<>::top(): empty stack");
+
+    // A mock SHA-256 hash function for demonstration (actual SHA-256 would need a library)
+    std::string calculateHash() const {
+        std::stringstream ss;
+        ss << index << timestamp << data << previousHash << nonce;
+        std::string input = ss.str();
+        
+        // Simple hashing logic for demonstration
+        unsigned long hashVal = 5381;
+        for (char c : input) {
+            hashVal = ((hashVal << 5) + hashVal) + c;
+        }
+        
+        std::stringstream res;
+        res << std::hex << std::setw(16) << std::setfill('0') << hashVal;
+        return res.str();
     }
-    return elements.back();
-  }
-  bool empty() const { return elements.empty(); }
-  size_t size() const { return elements.size(); }
+
+    // "Mining" simulation: increment nonce until hash starts with zeros
+    void mineBlock(int difficulty) {
+        std::string target(difficulty, '0');
+        while (hash.substr(0, difficulty) != target) {
+            nonce++;
+            hash = calculateHash();
+        }
+        std::cout << "Block Mined! Hash: " << hash << std::endl;
+    }
 };
 
-// Simple Node for Linked List
-struct Node {
-  int data;
-  Node *next;
-  Node(int val) : data(val), next(nullptr) {}
-};
-
-// Singly Linked List implementation
-class LinkedList {
+class Blockchain {
 private:
-  Node *head;
+    std::vector<Block> chain;
+    int difficulty;
 
 public:
-  LinkedList() : head(nullptr) {}
-  ~LinkedList() {
-    Node *current = head;
-    while (current != nullptr) {
-      Node *next = current->next;
-      delete current;
-      current = next;
+    Blockchain() {
+        difficulty = 2; // Simple difficulty for demo
+        // Genesis Block
+        chain.emplace_back(0, "Genesis Block (Bitcoin Start)", "0");
     }
-  }
-  void insert(int val) {
-    Node *newNode = new Node(val);
-    newNode->next = head;
-    head = newNode;
-  }
-  void display() {
-    Node *temp = head;
-    while (temp != nullptr) {
-      std::cout << temp->data << " -> ";
-      temp = temp->next;
+
+    void addBlock(const std::string& data) {
+        std::cout << "Mining new block for: " << data << "..." << std::endl;
+        Block newBlock(chain.size(), data, chain.back().hash);
+        newBlock.mineBlock(difficulty);
+        chain.push_back(newBlock);
     }
-    std::cout << "nullptr" << std::endl;
-  }
+
+    void displayChain() const {
+        std::cout << "\n--- Bitcoin Blockchain Visualization ---\n";
+        for (const auto& block : chain) {
+            std::cout << "Index: " << block.index << "\n"
+                      << "Data: " << block.data << "\n"
+                      << "Hash: " << block.hash << "\n"
+                      << "Prev: " << block.previousHash << "\n"
+                      << "Nonce: " << block.nonce << "\n"
+                      << "----------------------------------------\n";
+        }
+    }
+
+    bool isChainValid() const {
+        for (size_t i = 1; i < chain.size(); ++i) {
+            const Block& currentBlock = chain[i];
+            const Block& prevBlock = chain[i - 1];
+
+            if (currentBlock.hash != currentBlock.calculateHash()) return false;
+            if (currentBlock.previousHash != prevBlock.hash) return false;
+        }
+        return true;
+    }
 };
 
 int main() {
-  std::cout << "=== Data Structures and Algorithms Demo (C++) ===" << std::endl;
+    Blockchain bitcoinDemo;
 
-  // 1. Linked List Demo
-  std::cout << "\n[Linked List Demo]" << std::endl;
-  LinkedList list;
-  list.insert(10);
-  list.insert(20);
-  list.insert(30);
-  std::cout << "List content: ";
-  list.display();
+    std::cout << "Starting Bitcoin-themed DSA Project...\n";
+    
+    bitcoinDemo.addBlock("Transaction: Alice -> Bob 0.5 BTC");
+    bitcoinDemo.addBlock("Transaction: Bob -> Charlie 0.1 BTC");
 
-  // 2. Stack Demo
-  std::cout << "\n[Stack Demo]" << std::endl;
-  Stack<std::string> stringStack;
-  stringStack.push("Data");
-  stringStack.push("Structures");
-  stringStack.push("Project");
+    bitcoinDemo.displayChain();
 
-  std::cout << "Stack size: " << stringStack.size() << std::endl;
-  std::cout << "Popping elements: ";
-  while (!stringStack.empty()) {
-    std::cout << stringStack.top() << " ";
-    stringStack.pop();
-  }
-  std::cout << std::endl;
+    std::cout << "Is Blockchain Valid? " << (bitcoinDemo.isChainValid() ? "Yes" : "No") << "\n";
 
-  return 0;
+    return 0;
 }
